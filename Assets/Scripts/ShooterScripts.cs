@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public class ShoterScripts : MonoBehaviour
 {
@@ -12,14 +13,21 @@ public class ShoterScripts : MonoBehaviour
     private Vector2 starPos;
     private bool shoot,isAiming;
     private GameObject Dots;
+    private GameController gc;
     private List<GameObject> projectilesPath;
     private Rigidbody2D ballBody;
     public GameObject ballPrefab;
     public GameObject ballContainer;
 
+    private void Awake() 
+    {
+     gc=GameObject.Find("GameController").GetComponent<GameController>();
+     Dots=GameObject.Find("Dots");
+
+    }
     void Start()
     {
-        Dots=GameObject.Find("Dots");
+       
         projectilesPath=Dots.transform.Cast<Transform>().ToList().ConvertAll(t=> t.gameObject);
       HideDots();
     
@@ -28,22 +36,31 @@ public class ShoterScripts : MonoBehaviour
 
     
     void Update()
-    { ballBody=ballPrefab.GetComponent<Rigidbody2D>();
-    
-        Aiming();
-        Rotate();
+    { 
+        ballBody=ballPrefab.GetComponent<Rigidbody2D>();
+        if(gc.shootCount<=3&&!IsMouseOverUI())
+        {
+            Aiming();
+            Rotate();
+        }
+       
     }
+    private bool IsMouseOverUI(){
+       return EventSystem.current.IsPointerOverGameObject();
+   }
     void Aiming(){
         if(shoot)
         {
             return;
         }
+           
         if(Input.GetMouseButton(0))
         {
             if(!isAiming)
             {
                 isAiming= true;
                 starPos = Input.mousePosition;
+                gc.CheckShotCount();
             }
             else
             {
@@ -56,8 +73,10 @@ public class ShoterScripts : MonoBehaviour
         else if(isAiming&&!shoot)
         {
             isAiming=false;
-            StartCoroutine(Shoot());
             HideDots();
+            StartCoroutine(Shoot());
+            if(gc.shootCount==1)
+            Camera.main.GetComponent<CameraTransitions>().RotateCameraToSide();
             
         }
     }
@@ -81,6 +100,7 @@ public class ShoterScripts : MonoBehaviour
         point.z=1;
         projectilesPath[i].transform.position=point;
       }
+      
    }
 
 void ShowDots(){
@@ -103,14 +123,20 @@ void Rotate(){
 }
 
 IEnumerator Shoot(){
-    for(int i=0; i<5; i++){
+    for(int i=0; i<gc.BallsCount; i++){
         yield return new WaitForSeconds(0.07f);
         GameObject ball=Instantiate(ballPrefab,transform.position,Quaternion.identity);
         ball.name="Ball";
         ball.transform.SetParent(ballContainer.transform);
         ballBody=ball.GetComponent<Rigidbody2D>();
         ballBody.AddForce(ShootForce(Input.mousePosition)); 
+        int balls=gc.BallsCount-i;
+        gc.ballsCountText.text=(gc.BallsCount-i-1).ToString();
+
 
     }
+     yield return new WaitForSeconds(0.5f);
+    gc.shootCount++;
+    gc.ballsCountText.text=gc.BallsCount.ToString();
 }
 }
